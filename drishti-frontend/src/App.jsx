@@ -411,7 +411,7 @@ function App() {
 
   return (
     <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'sans-serif' }}>
-      <h1>Drishti (Four-Brain System)</h1>
+      <h1>The EchoWalk (Phase 1)</h1>
 
       <button onClick={toggleVoice} style={{ padding: '10px', margin: '5px' }}>
         Voice Warnings: {isVoiceOn ? 'ON' : 'OFF'}
