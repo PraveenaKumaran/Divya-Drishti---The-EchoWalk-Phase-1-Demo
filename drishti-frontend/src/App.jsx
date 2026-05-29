@@ -194,7 +194,7 @@ function App() {
     const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
     try {
-      const response = await fetch('http://localhost:8000/analyze', {
+      const response = await fetch('https://divya-drishti-the-echowalk-phase-1-demo.onrender.com/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_base64: base64Image }),
@@ -353,7 +353,7 @@ function App() {
           const endLat = parseFloat(geoData[0].lat);
           const endLon = parseFloat(geoData[0].lon);
 
-          const res = await fetch('http://localhost:8000/route', {
+          const res = await fetch('https://divya-drishti-the-echowalk-phase-1-demo.onrender.com/route', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
