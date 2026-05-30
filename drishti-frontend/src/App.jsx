@@ -24,20 +24,20 @@ const tamilDictionary = {
 
 // ORS maneuver "type" code -> Tamil phrase.
 const TAMIL_MANEUVERS = {
-  0: 'இடதுபுறம் திரும்பவும்',                 // turn left
-  1: 'வலதுபுறம் திரும்பவும்',                 // turn right
-  2: 'கூர்மையாக இடதுபுறம் திரும்பவும்',        // sharp left
-  3: 'கூர்மையாக வலதுபுறம் திரும்பவும்',        // sharp right
-  4: 'சற்று இடதுபுறம் செல்லவும்',              // slight left
-  5: 'சற்று வலதுபுறம் செல்லவும்',              // slight right
-  6: 'நேராக செல்லவும்',                       // continue straight
-  7: 'சுற்றுவட்டத்தில் நுழையவும்',             // enter roundabout
-  8: 'சுற்றுவட்டத்திலிருந்து வெளியேறவும்',      // exit roundabout
-  9: 'பின்னோக்கி திரும்பவும்',                 // u-turn
-  10: 'நீங்கள் இலக்கை அடைந்துவிட்டீர்கள்',      // arrive
-  11: 'நேராக நடக்கத் தொடங்கவும்',              // depart
-  12: 'இடதுபக்கம் ஒட்டி செல்லவும்',            // keep left
-  13: 'வலதுபக்கம் ஒட்டி செல்லவும்',            // keep right
+  0: 'இடதுபுறம் திரும்பவும் (Turn Left)',                
+  1: 'வலதுபுறம் திரும்பவும் (Turn Right)',              
+  2: 'கூர்மையாக இடதுபுறம் திரும்பவும் (Sharp Left)',        
+  3: 'கூர்மையாக வலதுபுறம் திரும்பவும் (Sharp Right)',        
+  4: 'சற்று இடதுபுறம் செல்லவும் (Slight Left)',              
+  5: 'சற்று வலதுபுறம் செல்லவும் (Slight Right)',              
+  6: 'நேராக செல்லவும் (Continue Straight)',               
+  7: 'சுற்றுவட்டத்தில் நுழையவும் (Enter Roundabout)',             
+  8: 'சுற்றுவட்டத்திலிருந்து வெளியேறவும் (Exit Roundabout)',      
+  9: 'பின்னோக்கி திரும்பவும் (U-Turn)',                 
+  10: 'நீங்கள் இலக்கை அடைந்துவிட்டீர்கள் (Arrive)',      
+  11: 'நேராக நடக்கத் தொடங்கவும் (Depart)',              
+  12: 'இடதுபக்கம் ஒட்டி செல்லவும் (Keep Left)',            
+  13: 'வலதுபக்கம் ஒட்டி செல்லவும் (Keep Right)',            
 };
 
 const ANNOUNCE_RADIUS_M = 20;
@@ -57,29 +57,20 @@ function App() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
-  // Memory to prevent Audio Spam (Audio Fatigue)
   const lastSpokenTimeRef = useRef({});
+  const lastDistRef = useRef(Infinity); 
+  const warned20mRef = useRef(false);   
+  const warned5mRef = useRef(false);    
 
-  // NEW: Advanced Navigation Memory
-  const lastDistRef = useRef(Infinity); // Tracks if they are going the wrong way
-  const warned20mRef = useRef(false);   // Remembers if we gave the prep warning
-  const warned5mRef = useRef(false);    // Remembers if we gave the action warning
-
-  // NEW: State to track if the AR High-Contrast filter is active
   const [isHighContrast, setIsHighContrast] = useState(false);
-
   const [model, setModel] = useState(null);
   const [isVoiceOn, setIsVoiceOn] = useState(localStorage.getItem('voiceEnabled') === 'true');
   const [aiSight, setAiSight] = useState('Waiting to start...');
   const [tamilVoice, setTamilVoice] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
-
-  // NEW: Dedicated visual state for Navigation so the Fast Brain doesn't overwrite it
   const [navStatus, setNavStatus] = useState('');
-  // NEW: Memory to track the last spoken distance so it doesn't spam the user
   const lastSpokenDistanceRef = useRef(null);
 
-  // Navigation state
   const [destination, setDestination] = useState('');
   const [navigating, setNavigating] = useState(false);
   const stepsRef = useRef([]);        
@@ -141,10 +132,6 @@ function App() {
     }
   };
 
-  /**
-   * "Memory Cooldown" (Debounce)
-   * We will teach the Fast Brain to remember what it just saw and stay quiet for 5 seconds before repeating the exact same warning.
-   */
   const detectObjects = async () => {
     if (model && videoRef.current && videoRef.current.readyState === 4) {
       const predictions = await model.detect(videoRef.current);
@@ -155,21 +142,15 @@ function App() {
         setAiSight(`Fast Brain sees: ${firstObj.class} (Width: ${boxWidth}px)`);
         
         if (tamilDictionary[firstObj.class] && boxWidth > 150 && isVoiceOnRef.current) {
-          
-          // --- THE COOLDOWN UPGRADE ---
           const now = Date.now();
-          const cooldownTime = 5000; // 5 seconds of silence before repeating the same object
+          const cooldownTime = 5000;
           const lastTimeSpoken = lastSpokenTimeRef.current[firstObj.class] || 0;
 
-          // Only speak if 5 seconds have passed since we last warned them about this specific object
           if (now - lastTimeSpoken > cooldownTime) {
             const isPriority = slowLoopSpeakingRef.current;
             speakTamil(tamilDictionary[firstObj.class], { priority: isPriority, rate: 1.8 });
-            
-            // Save the exact time we spoke this warning
             lastSpokenTimeRef.current[firstObj.class] = now;
           }
-          
         }
       } else {
         setAiSight('Path clear.');
@@ -219,7 +200,6 @@ function App() {
     setIsScanning(false);
   };
 
-  // --- BRAIN 3: Where am I? (Location Awareness) ---
   const handleLocationAwareness = () => {
     speakTamil("உங்கள் இடத்தை தேடுகிறேன்...", { priority: true, rate: 1.8 }); 
     setAiSight("Finding GPS Location...");
@@ -233,7 +213,8 @@ function App() {
           const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
           const data = await response.json();
           const addr = data.address;
-          const locationName = addr.suburb || addr.neighbourhood || addr.residential || addr.village || addr.road || addr.town || "கோயம்புத்தூர்";          const locationMessage = `நீங்கள் இப்போது ${locationName} பகுதியில் உள்ளீர்கள்.`; 
+          const locationName = addr.suburb || addr.neighbourhood || addr.residential || addr.village || addr.road || addr.town || "கோயம்புத்தூர்";         
+          const locationMessage = `நீங்கள் இப்போது ${locationName} பகுதியில் உள்ளீர்கள்.`; 
           
           setAiSight(`Location: ${locationName}`);
           speakTamil(locationMessage, { priority: true });
@@ -253,14 +234,13 @@ function App() {
     }
   };
 
-  // --- BRAIN 4: Turn-by-Turn Walking Navigation ---
   const stopNavigation = (announce = false) => {
     if (watchIdRef.current != null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
     setNavigating(false);
-    setNavStatus(''); // Clear the text when stopped
+    setNavStatus(''); 
     if (announce) speakTamil('வழிகாட்டுதல் நிறுத்தப்பட்டது', { priority: true }); 
   };
 
@@ -272,48 +252,40 @@ function App() {
     const next = steps[idx];
     const d = Math.round(distanceMeters(pos.coords.latitude, pos.coords.longitude, next.lat, next.lon));
     
-    setNavStatus(`Next turn in ${d} meters`);
     const maneuverTamil = TAMIL_MANEUVERS[next.type] || 'நேராக செல்லவும்';
+    
+    // VISUAL UPDATE: Shows distance + the actual turn text
+    setNavStatus(`${d} மீட்டர்: ${maneuverTamil}`);
 
-    // EDGE CASE 1: WRONG WAY DETECTION
-    // If the distance increased by more than 10 meters, they walked past the turn!
+    // LOGIC: Wrong Way Detection
     if (lastDistRef.current !== Infinity && d > lastDistRef.current + 10) {
-      speakTamil("நீங்கள் தவறான திசையில் செல்கிறீர்கள்", { priority: true, rate: 1.5 }); // "You are going in the wrong direction"
-      lastDistRef.current = d; // Reset baseline so we don't spam it
+      speakTamil("நீங்கள் தவறான திசையில் செல்கிறீர்கள்", { priority: true, rate: 1.5 }); 
+      lastDistRef.current = d; 
     } else if (d < lastDistRef.current) {
-      lastDistRef.current = d; // Update only if they are getting closer (ignores GPS bounce)
+      lastDistRef.current = d; 
     }
 
-    // EDGE CASE 2: TWO-STAGE TURNS
+    // LOGIC: Proximity Triggers
     if (d <= 20 && d > 5 && !warned20mRef.current) {
-      // PREPARATION: 20 meters away
-      speakTamil(`20 மீட்டரில் ${maneuverTamil}`, { priority: true }); // "In 20 meters, [turn left]"
+      speakTamil(`20 மீட்டரில் ${maneuverTamil}`, { priority: true }); 
       warned20mRef.current = true;
     } 
     else if (d <= 5 && !warned5mRef.current) {
-      // EXECUTION: 5 meters away
       warned5mRef.current = true;
       
-      // Check if this is the absolute final destination (Code 10)
       if (next.type === 10 || idx === steps.length - 1) {
         speakTamil("நீங்கள் இலக்கை அடைந்துவிட்டீர்கள். கதவை கண்டுபிடிக்க டீப் ஸ்கேன் பயன்படுத்தவும்.", { priority: true }); 
-        // "You have reached the destination. Use Deep Scan to find the door."
         stopNavigation(false);
       } else {
-        // Normal turn: tell them to do it NOW, then load the next step
-        speakTamil(`இப்போது ${maneuverTamil}`, { priority: true }); // "Now, [turn left]"
-        
+        speakTamil(`இப்போது ${maneuverTamil}`, { priority: true }); 
         stepIndexRef.current = idx + 1;
-        // Reset all flags for the next street!
         warned20mRef.current = false;
         warned5mRef.current = false;
         lastDistRef.current = Infinity;
         lastSpokenDistanceRef.current = null;
       }
     } 
-    // EDGE CASE 3: LONG STRAIGHT ROADS (Distance Reminders)
     else if (d > 20) {
-      // Only remind them every 15 meters so they don't get audio fatigue
       if (lastSpokenDistanceRef.current === null || Math.abs(lastSpokenDistanceRef.current - d) >= 15) {
         speakTamil(`இன்னும் ${d} மீட்டர்`, { priority: false, rate: 1.5 });
         lastSpokenDistanceRef.current = d;
@@ -361,27 +333,29 @@ function App() {
               end_lat: endLat, end_lon: endLon,
             }),
           });
+          
           if (!res.ok) {
             const e = await res.json().catch(() => ({}));
             throw new Error(e.detail || `HTTP ${res.status}`);
           }
+          
           const data = await res.json();
           stepsRef.current = data.steps || [];
           stepIndexRef.current = 0;
 
           if (!stepsRef.current.length) {
             speakTamil('வழி கிடைக்கவில்லை', { priority: true });
+            setNavStatus('Route failed'); // <-- FIX: Update UI if no steps
             return;
           }
 
           setNavigating(true);
-          setNavStatus(`Navigating: ${data.total_distance_m} m, ${stepsRef.current.length} steps`);
           
-          // Reset all memory trackers for the new trip
           lastSpokenDistanceRef.current = null;
           lastDistRef.current = Infinity;
           warned20mRef.current = false;
           warned5mRef.current = false;
+          
           stepIndexRef.current = 1; 
 
           speakTamil(
@@ -395,15 +369,18 @@ function App() {
             (err) => console.error('watchPosition error:', err),
             { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
           );
+          
         } catch (err) {
           console.error('Route error:', err);
           speakTamil('வழி கண்டறிய முடியவில்லை', { priority: true });
-          setAiSight('Route failed');
+          setAiSight('Route calculation error');
+          setNavStatus('Route failed'); // <-- FIX: Clears the "Finding route..." state
         }
       },
       (err) => {
         console.error('GPS error:', err);
         speakTamil('ஜிபிஎஸ் அனுமதி தேவை', { priority: true });
+        setNavStatus('GPS Error');
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -417,7 +394,6 @@ function App() {
         Voice Warnings: {isVoiceOn ? 'ON' : 'OFF'}
       </button>
 
-      {/* NEW: The AR Filter Toggle Button */}
       <button 
         onClick={() => setIsHighContrast(!isHighContrast)} 
         style={{ padding: '10px', margin: '5px', backgroundColor: isHighContrast ? '#333' : '#ddd', color: isHighContrast ? '#fff' : '#000', fontWeight: 'bold' }}
@@ -466,11 +442,9 @@ function App() {
 
       <br />
       
-      {/* PERFECTLY SEPARATED STATUS LINES */}
       <h3 style={{ color: 'blue', minHeight: '30px', margin: '5px' }}>{aiSight}</h3>
       <h3 style={{ color: 'green', minHeight: '30px', margin: '5px' }}>{navStatus}</h3>
 
-      {/* UPGRADED: Video player with dynamic CSS AR Filtering */}
       <video 
         ref={videoRef} 
         width="400" 
@@ -478,7 +452,7 @@ function App() {
         style={{ 
           border: '2px solid black',
           borderRadius: '8px',
-          transition: 'all 0.3s ease', // Makes the switch look smooth
+          transition: 'all 0.3s ease',
           filter: isHighContrast ? 'contrast(300%) grayscale(100%) invert(100%)' : 'none' 
         }} 
         muted 
