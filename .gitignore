@@ -1,0 +1,12 @@
+# Secure Environment Variables
+.env
+.env.*
+*.env
+
+# Python specific
+.venv/
+__pycache__/
+*.pyc
+
+# Node specific
+node_modules/

@@ -88,7 +88,7 @@ function App() {
 
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
-      const foundVoice = voices.find((v) => v.lang.includes('ta-IN') || v.lang.includes('ta'));
+      const foundVoice = voices.find((v) => v.lang === 'ta-IN' || v.lang.startsWith('ta'));
       if (foundVoice) setTamilVoice(foundVoice);
     };
     loadVoices();
@@ -106,16 +106,20 @@ function App() {
     localStorage.setItem('voiceEnabled', newSetting.toString());
   };
 
+  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const mobileRateFactor = 0.6;
+  const normalizeRate = (rate) => (isMobile ? rate * mobileRateFactor : rate);
+
   const speakTamil = (textToSpeak, { priority = false, rate = 1.5 } = {}) => {
     if (!textToSpeak) return;
     if (priority) {
       window.speechSynthesis.cancel();
       slowLoopSpeakingRef.current = false;
     } else if (window.speechSynthesis.speaking) {
-      return; 
+      return;
     }
     const msg = new SpeechSynthesisUtterance(textToSpeak);
-    msg.rate = rate;
+    msg.rate = normalizeRate(rate);
     msg.pitch = 1.1;
     if (tamilVoice) msg.voice = tamilVoice;
     else msg.lang = 'ta-IN';
@@ -187,7 +191,7 @@ function App() {
 
       window.speechSynthesis.cancel();
       const resultMsg = new SpeechSynthesisUtterance(resultText);
-      resultMsg.rate = 1.5;
+      resultMsg.rate = normalizeRate(1.5);
       if (tamilVoice) resultMsg.voice = tamilVoice;
       else resultMsg.lang = 'ta-IN';
       slowLoopSpeakingRef.current = true;
